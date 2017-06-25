@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+# vim: ts=4 sw=4 et
+#
+# This Works is placed under the terms of the Copyright Less License,
+# see file COPYRIGHT.CLL.  USE AT OWN RISK, ABSOLUTELY NO WARRANTY.
+
+import os
+import sys
+import logging
+
+logging.basicConfig(level="DEBUG")
+
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'py'))
+import nastysan
+
+try:
+    nastysan.main(*sys.argv[1:])
+except KeyboardInterrupt:   # why is this never received?
+    pass
+

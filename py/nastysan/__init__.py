@@ -65,6 +65,8 @@ class Subsystem(object):
     def err(self, errno):
         raise llfuse.FUSEError(errno)
 
+    def destroy(self):
+        pass
 
 
 
@@ -81,8 +83,10 @@ class Operations(llfuse.Operations):
 # Must not raise any exceptions (including `FUSEError`)
     def __init__(self, sub):
         super().__init__()
-
         self.sub = sub
+
+    def isActive(self):
+        return not (self.sub is None)
 
     def log(self, s, *args, **kw):
         if not self.__map:  self.__map_init()
@@ -135,6 +139,8 @@ class Operations(llfuse.Operations):
     def destroy(self):
         self.log('destroy')
         self.sub.destroy()
+        self.sub    = None
+
 # This method will be called when `llfuse.close` has been called
 # and the file system is about to be unmounted.
 # 
@@ -518,5 +524,14 @@ def main(*args):
     mnt = os.path.join(os.path.expanduser('~/mnt'), arg)
 
     llfuse.init(ops, mnt, opt)
-    llfuse.main()   # why can this not be restarted after interrupts?
+    #while ops.isActive():
+    #    log.debug('calling llfuse.main')
+    # apparently, we do not need to loop here
+    llfuse.main()
+    # looks like if llfuse.main() returns,
+    # everything has come to an end
+    llfuse.close()
+
+if __name__ == '__main__':
+    main(*sys.argv[1:])
 
