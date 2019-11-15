@@ -76,6 +76,13 @@ class Subsystem(object):
 
 
 # Longer comments are from example, will vanish when implemented
+# So following is:
+#
+# FUSE: Filesystem in Userspace
+# Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+# This program can be distributed under the terms of the GNU LGPLv2.
+# See the file COPYING.LIB.
+#
 class Operations(llfuse.Operations):
     __mapchars = list(chars('az', 'AZ', '09'))
     __map = None
