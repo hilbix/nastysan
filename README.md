@@ -31,7 +31,7 @@ and use following entry in `/etc/fstab`:
 
 Usually, CONFIG is just a writeable file.
 
-When the config file starts exists, starts with a SheBang `#!` or is executable,
+When the config file exists, starts with a SheBang `#!` or is executable,
 the argument is executed by NAStySAN with following properties:
 
 - To read the configuration, the script is called without parameters.
