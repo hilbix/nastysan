@@ -1,0 +1,9 @@
+[submodule "fusetree"]
+	path = fusetree
+	url = https://github.com/hilbix/fusetree.git
+[submodule "pyfuse3"]
+	path = pyfuse3
+	url = https://github.com/libfuse/pyfuse3.git
+[submodule "trio"]
+	path = trio
+	url = https://github.com/python-trio/trio.git
