@@ -111,14 +111,14 @@ The catalog of known pool members is kept as softlinks under `node/NAME/pool/`.
 
 - You can add and remove soflinks to enable/disable such pool members.
 - Disabling a pool member means, that you can no more access the data on it.
-- Radundancy usually ensures, that no data is missing.
+- Redundancy usually ensures, that no data is missing.
 
 A storage pool can be added even if it is not initialized yet.  This means it is cataloged, but is not yet enabled.
 
 To enable such a member, use `nastysan-mkpool` command, giving the file or device.
 This will only create a new pool if the first 16 MB and last 16 MB of the destination are empty (`NUL` or `00`-bytes).
 
-- This is to not accidentally overwrite valuable data.
+- This is done to not accidentally overwrite valuable data.
 - This also means, that a minimum pool member size is 32 MB.
 
 Note that this will show up as a `PV` later on, as `LVM` is used to manage pool members.
@@ -171,6 +171,32 @@ This is why I create NAStySAN, which is a joke for "NAS type SAN".
 
 - No, it's not a NAS, as it is no filesystem.
 - No, it's not a SAN, as it is is not low level.
+
+
+## Future
+
+There is no independent NAStySAN filesystem yet.  Something which is completely managed by NAStySAN itself.
+Enabling it to use Mirror/RAID/Dedup features and the like on file level, not on block device level.
+
+This might show up if things settle a bit.  If I ever have the need to do this.  But for now there is no such thing.
+
+Note that NAStySAN offers something like a filesystem.  In the `node/` store you can add static files, which are then
+available to all nodes.  However changing this data means to change the configuration data on all nodes in parallel.
+
+So this is not meant to keep some bigger data chunks, just small text snippets you need to manage the fleet of nodes.
+Things your own scripts need to run correctly.  And there is no standard of what these files must look like.
+
+This is a poor thing as a filesystem.
+
+Adding something like a filesystem needs basically two parts:
+
+- Managing metadata, like directory tree, flags and other file metadata.
+- Managing file contents.
+
+This all is easy if the filesystem is only accessible at one node excusively.  And this probably is the way to go first.
+
+However we want more, of course.  To be something like a NAS, we need concurrent file access like on NFS.
+However we do not want something like NFS, as we do not want to have a central service, which might fail.
 
 
 ## License
