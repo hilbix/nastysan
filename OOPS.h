@@ -59,8 +59,10 @@ enum
   FORMAT_ULL,
   };
 
+/* XXX TODO XXX Many formats from above are missing for now	*/
 #define	fARGS(s,v)	(void *)FORMAT_ARGS, (const char *)s, &v
 #define	fINT(X)		(void *)FORMAT_INT, (int)(X)
+#define	fULL(X)		(void *)FORMAT_ULL, (unsigned long long)(X)
 
 static size_t
 FORMATnr(char *buf, size_t len, unsigned long long n, int base)
@@ -109,14 +111,58 @@ FORMATnr(char *buf, size_t len, unsigned long long n, int base)
 }
 
 static void
-FORMATfill(char fill, int width, void (*cb)(void *user, const void *, size_t len), void *user, char *buf, size_t len)
+FORMATfill(char fill, int width, void (*cb)(void *user, const void *, size_t len), void *user)
 {
+  char	buf[1024];
+
   if (width < 0)
     return;
-  memset(buf, fill, len);
-  while ((width -= len)>0)
-    cb(user, buf, len);
-  cb(user, buf, len+width);
+  memset(buf, fill, sizeof buf);
+  while ((width -= sizeof buf)>0)
+    cb(user, buf, sizeof buf);
+  cb(user, buf, width + sizeof buf);
+}
+
+/* We need this to not put the big buffer from stack within the recursion
+ */
+static size_t
+FORMATsigned(int type, unsigned long long ull, long long ll, int base, int width, int fill, int sign, void (*cb)(void *user, const void *, size_t), void *user)
+{
+  char		tmp[PATH_MAX];	/* this is the big buffer we want to avoid	*/
+  size_t	n;
+
+  if (type==1)
+    {
+      if (ll<0)
+        {
+          sign	= '-';
+          ull	= -ll;
+        }
+      else
+        ull	= ll;
+    }
+
+  /* If fill is too big, pre-fill as this uses tmp buffer
+   */
+  n	= sizeof tmp - 8*sizeof ull;
+  if (width > n)
+    {
+      FORMATfill(fill, width - n, cb, user);
+      width	= n;
+    }
+
+  /* get number	*/
+  n	= FORMATnr(tmp, sizeof tmp, ull, base);
+  if (sign)
+    tmp[--n]	= sign;
+
+  /* fill it on the left	*/
+  while (n >= sizeof tmp - width && n)
+    tmp[--n]	= fill;
+
+  /* output	*/
+  cb(user, tmp+n, sizeof tmp - n);
+  return n;
 }
 
 /* No floating point for now
@@ -129,18 +175,19 @@ vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char
   for (;; s=va_arg(list, void *))
     {
       int			type;
-      long long			ll;
-      unsigned long long	ull;
-      char			tmp[PATH_MAX];
+      long long			ll  = 0;	/* shutup compiler	*/
+      unsigned long long	ull = 0;	/* shutup compiler	*/
       size_t			n;
 
       switch ((uintptr_t)s)
         {
         case FORMAT_ARGS:	s	= va_arg(list, const char *); vFORMAT(cb, user, s, *va_arg(list, va_list *)); continue;
+        /* THIS ^^^^^ is missing in printf(), so I need to re-invent the wheel, sigh.	*/
         case FORMAT_NULL:	return;
         default:
           n	= strlen(s);
-          FORMATfill(fill, width-n, cb, user, tmp, sizeof tmp);
+          FORMATfill(fill, width-n, cb, user);
+          cb(user, s, n);
           goto out;
 
         case FORMAT_BASE:	base	= va_arg(list, int);		continue;
@@ -148,7 +195,6 @@ vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char
         case FORMAT_FILL:	fill	= (char)va_arg(list, int);	continue;
         case FORMAT_SIGN:	sign	= fill;				continue;
         case FORMAT_PLUS:	sign	= '+';				continue;
-
 
         case FORMAT_I8:		ll	= (int8_t)va_arg(list, int);	type=1; break;
         case FORMAT_I16:	ll	= (int16_t)va_arg(list, int);	type=1; break;
@@ -168,45 +214,13 @@ vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char
         case FORMAT_ULONG:	ull	= va_arg(list, unsigned long);	type=2; break;
         case FORMAT_ULL:	ull	= va_arg(list, unsigned long);	type=2; break;
         }
-      if (type==1)
-        {
-          if (ll<0)
-            {
-              sign	= '-';
-              ull	= -ll;
-            }
-          else
-            ull	= ll;
-        }
-
-      /* If fill is too big, pre-fill as this uses tmp buffer
-       */
-      n	= sizeof tmp - 8*sizeof ull;
-      if (width > n)
-        {
-          FORMATfill(fill, width - n, cb, user, tmp, sizeof tmp);
-          width	= n;
-        }
-
-      /* get number	*/
-      n	= FORMATnr(tmp, sizeof tmp, ull, base);
-      if (sign)
-        tmp[--n]	= sign;
-
-      /* fill it on the left	*/
-      while (n >= sizeof tmp - width && n)
-        tmp[--n]	= fill;
-
-      s	= tmp+n;
-      n	= sizeof tmp - n;
+      n	= FORMATsigned(type, ull, ll, base, width, fill, sign, cb, user);
 
 out:
-      /* output	*/
-      cb(user, s, n);
-
       /* fill it on the right	*/
-      FORMATfill(fill, -width-n, cb, user, tmp, sizeof tmp);
+      FORMATfill(fill, -width-n, cb, user);
 
+      /* reset format after output	*/
       base=10, width=0, fill=0, sign=0;
     }
 }
@@ -287,5 +301,24 @@ _LOG(const char *s, ...)
   va_start(list, s);
   STDOUTf(fARGS(s, list), "\n", NULL);
   va_end(list);
+}
+
+/*
+ * Memory
+ */
+
+static void *
+re_alloc(void *buf, size_t len)
+{
+  buf	= realloc(buf, len);
+  if (!buf)
+    OOPS("out of memory allocating ", fULL(len), " bytes");
+  return buf;
+}
+
+static void *
+alloc(size_t len)
+{
+  return re_alloc(NULL, len);
 }
 
