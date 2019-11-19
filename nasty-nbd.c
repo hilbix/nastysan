@@ -33,7 +33,7 @@ nasty_init(N)
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, fd))
     OOPS("cannot get socketpair()");
 
-  nasty_nl_init(&n->nl);
+  nasty_nl_open(&n->nl);
   n->kernel_fd	= fd[0];
   n->user_fd	= fd[1];
 }
@@ -75,7 +75,7 @@ main(int argc, char **argv)
 #endif
 
   /* now open /dev/nbdX	*/
-  nasty_nl_start(&n->nl, NASTY_NL_NBD_ANY, 1, &n->kernel_fd, n->devsize);
+  nasty_nl_start(&n->nl, NASTY_NL_NBD_ANY, n->devsize, 1, &n->kernel_fd);
   LOG("got /dev/nbd", fINT(n->nl.nbd));
 
   /* close the unused server socket at our side	*/
