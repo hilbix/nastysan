@@ -83,9 +83,10 @@ nasty_nl_msg(struct nasty_nl_nbd *nl)
   msg	= nlmsg_alloc();
   if (!msg)
     OOPS("cannot allocate netlink message");
-  r	= alloc(sizeof *r);
-  r->nl	= nl;
-  r->msg= msg;
+  r		= alloc(sizeof *r);
+  r->nl		= nl;
+  r->msg	= msg;
+  r->nest	= 0;
   return r;
 }
 
@@ -154,7 +155,7 @@ nasty_nl_msg_u64(struct nasty_nl_msg *m, int attr, uint64_t u)
 static struct nasty_nl_nbd *
 nasty_nl_open(struct nasty_nl_nbd *nl)
 {
-  memset(nl, 0, sizeof *nl);	/* ->version=0	*/
+  memset(nl, 0, sizeof *nl);	/* ->version=0 etc.	*/
 
   nl->nbd	= -1;
   nl->sock	= nl_socket_alloc();
