@@ -13,7 +13,7 @@ OBJS=$(patsubst %.c,%.o,$(SRCS))
 DEPS=$(patsubst %.c,%.d,$(SRCS))
 PROG=$(patsubst %.c,%,$(SRCS))
 
-CFLAGS=-Wall -O3 $(shell pkg-config --cflags $(LIBS))
+CFLAGS=-Wall -Wno-unused-function -O3 $(shell pkg-config --cflags $(LIBS))
 LDLIBS=$(shell pkg-config --libs $(LIBS))
 
 all:	$(DEPS)
