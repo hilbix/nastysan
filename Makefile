@@ -1,7 +1,7 @@
 #
 
-LIBS=libnl-3.0 libnl-genl-3.0
 DEVS=libnl-3-dev libnl-genl-3-dev
+LIBS=libnl-3.0 libnl-genl-3.0
 
 love:	all
 
