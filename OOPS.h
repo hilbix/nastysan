@@ -10,6 +10,24 @@
 
 #include <unistd.h>
 
+#define	xDP(X...)	do {} while (0)
+#if 0
+#define	DP(X...)	do {} while (0)
+#else
+#define	DP(X...)	do { debugprintf(__FILE__, __LINE__, __FUNCTION__, X); } while (0)
+static void debugprintf(const char *file, int line, const char *fn, const char *s, ...)
+{
+  va_list	list;
+
+  fprintf(stderr, "[[%s:%d %s", file, line, fn);
+  va_start(list, s);
+  vfprintf(stderr, s, list);
+  va_end(list);
+  fprintf(stderr, "]]\n");
+  fflush(stderr);
+}
+#endif
+
 enum
   {
   FORMAT_NULL = 0,
@@ -106,7 +124,7 @@ FORMATfill(char fill, int width, void (*cb)(void *user, const void *, size_t len
 static void
 vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char *s, va_list list)
 {
-  int	base=0, width=0, fill=0, sign=0;
+  int	base=10, width=0, fill=0, sign=0;
 
   for (;; s=va_arg(list, void *))
     {
@@ -188,6 +206,8 @@ out:
 
       /* fill it on the right	*/
       FORMATfill(fill, -width-n, cb, user, tmp, sizeof tmp);
+
+      base=10, width=0, fill=0, sign=0;
     }
 }
 
@@ -230,6 +250,18 @@ _STDOUT(const char *s, ...)
   va_end(list);
 }
 
+#define	STDOUTf(X...)	_STDOUTf(X, NULL)
+static void
+_STDOUTf(const char *s, ...)
+{
+  va_list	list;
+
+  va_start(list, s);
+  vFORMAT(OUT, stdout, s, list);
+  va_end(list);
+  fflush(stdout);
+}
+
 #define	OOPS(X...)	_OOPS(X, NULL)
 __attribute__((noreturn))
 static void
@@ -253,7 +285,7 @@ _LOG(const char *s, ...)
   va_list	list;
 
   va_start(list, s);
-  STDOUT(fARGS(s, list), "\n", NULL);
+  STDOUTf(fARGS(s, list), "\n", NULL);
   va_end(list);
 }
 
