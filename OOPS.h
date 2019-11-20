@@ -61,8 +61,16 @@ enum
 
 /* XXX TODO XXX Many formats from above are missing for now	*/
 #define	fARGS(s,v)	(void *)FORMAT_ARGS, (const char *)s, &v
+#define	fCHAR(X)	(void *)FORMAT_CHAR, (char)(X)
 #define	fINT(X)		(void *)FORMAT_INT, (int)(X)
+#define	fU8(X)		(void *)FORMAT_U8, (uint8_t)(X)
+#define	fU16(X)		(void *)FORMAT_U16, (uint16_t)(X)
+#define	fU32(X)		(void *)FORMAT_U32, (uint32_t)(X)
+#define	fU64(X)		(void *)FORMAT_U64, (uint64_t)(X)
 #define	fULL(X)		(void *)FORMAT_ULL, (unsigned long long)(X)
+#define	fBASE(X)	(void *)FORMAT_BASE, (int)(X)
+#define	fWIDTH(X)	(void *)FORMAT_WIDTH, (int)(X)
+#define	fFILL(X)	(void *)FORMAT_FILL, (char)(X)
 
 static size_t
 FORMATnr(char *buf, size_t len, unsigned long long n, int base)
@@ -157,7 +165,7 @@ FORMATsigned(int type, unsigned long long ull, long long ll, int base, int width
     tmp[--n]	= sign;
 
   /* fill it on the left	*/
-  while (n >= sizeof tmp - width && n)
+  while (n > sizeof tmp - width && n)
     tmp[--n]	= fill;
 
   /* output	*/
@@ -170,7 +178,7 @@ FORMATsigned(int type, unsigned long long ull, long long ll, int base, int width
 static void
 vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char *s, va_list list)
 {
-  int	base=10, width=0, fill=0, sign=0;
+  int	base=10, width=0, fill=' ', sign=0;
 
   for (;; s=va_arg(list, void *))
     {
@@ -181,6 +189,8 @@ vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char
 
       switch ((uintptr_t)s)
         {
+	char c;
+
         case FORMAT_ARGS:	s	= va_arg(list, const char *); vFORMAT(cb, user, s, *va_arg(list, va_list *)); continue;
         /* THIS ^^^^^ is missing in printf(), so I need to re-invent the wheel, sigh.	*/
         case FORMAT_NULL:	return;
@@ -196,11 +206,12 @@ vFORMAT(void (*cb)(void *user, const void *, size_t len), void *user, const char
         case FORMAT_SIGN:	sign	= fill;				continue;
         case FORMAT_PLUS:	sign	= '+';				continue;
 
+        case FORMAT_CHAR:	c	= va_arg(list, int); cb(user, &c, 1); continue;
+
         case FORMAT_I8:		ll	= (int8_t)va_arg(list, int);	type=1; break;
         case FORMAT_I16:	ll	= (int16_t)va_arg(list, int);	type=1; break;
         case FORMAT_I32:	ll	= va_arg(list, int32_t);	type=1; break;
         case FORMAT_I64:	ll	= va_arg(list, int64_t);	type=1; break;
-        case FORMAT_CHAR:	ll	= (char)va_arg(list, int);	type=1; break;
         case FORMAT_INT:	ll	= va_arg(list, int);		type=1; break;
         case FORMAT_LONG:	ll	= va_arg(list, long);		type=1; break;
         case FORMAT_LL:		ll	= va_arg(list, long);		type=1; break;
@@ -221,7 +232,7 @@ out:
       FORMATfill(fill, -width-n, cb, user);
 
       /* reset format after output	*/
-      base=10, width=0, fill=0, sign=0;
+      base=10, width=0, fill=' ', sign=0;
     }
 }
 
