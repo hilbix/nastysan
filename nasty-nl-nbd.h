@@ -261,7 +261,7 @@ nasty_nl_start(struct nasty_nl_nbd *nl, int nbd, uint64_t nbdsize, int socks, in
   /* Why do sockets fail to be detected if done after these options?
    */
   if (nbd >= 0)		nasty_nl_msg_u32(m,	NBD_ATTR_INDEX,			nbd);
-//if (timeout)		nasty_nl_msg_u64(m,	NBD_ATTR_TIMEOUT,		timeout);
+  if (1)		nasty_nl_msg_u64(m,	NBD_ATTR_TIMEOUT,		5);
   if (flags)		nasty_nl_msg_u64(m,	NBD_ATTR_SERVER_FLAGS,		flags);
   if (blocksize)	nasty_nl_msg_u64(m,	NBD_ATTR_BLOCK_SIZE_BYTES,	blocksize);
   if (nbdsize)		nasty_nl_msg_u64(m,	NBD_ATTR_SIZE_BYTES,		nbdsize);
@@ -274,6 +274,10 @@ nasty_nl_start(struct nasty_nl_nbd *nl, int nbd, uint64_t nbdsize, int socks, in
  *
  * before:	nasty_nl_open()
  * after:	nasty_nl_close()
+ *
+ * DOES NOT WORK AT MY SIDE (Ubuntu 18.04 LTS, Kernel 4.15.0)
+ * "nbd: must specify at least one socket"
+ * whatever this means here.
  */
 static struct nasty_nl_nbd *
 nasty_nl_stop(struct nasty_nl_nbd *nl, int nbd)
