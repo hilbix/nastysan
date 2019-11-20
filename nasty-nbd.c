@@ -32,50 +32,123 @@ nasty_init(N)
 
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, fd))
     OOPS("cannot get socketpair()");
-
-  nasty_nl_open(&n->nl);
   n->kernel_fd	= fd[0];
   n->user_fd	= fd[1];
+
+  nasty_nl_open(&n->nl);
 }
+
+
+static void
+nbd_read(N, void *ptr, size_t len)
+{
+  while (len)
+    {
+      int	got;
+
+      got	= read(n->user_fd, ptr, len);
+      if (got<=0)
+        {
+          if (!got)
+            OOPS("EOF");
+          if (errno == EAGAIN || errno == EINTR)
+            continue;
+          OOPS("read error");
+        }
+      ptr	= ((char *)ptr)+got;
+      len	-= got;
+    }
+}
+
+static void
+dump(const char *what, const void *ptr, size_t len)
+{
+  const unsigned char	*p = ptr;
+
+  while (len)
+    {
+      int	i;
+
+      STDOUT(what, ":\t");
+      for (i=0; i<16 && i<len; i++)
+        STDOUT(fBASE(16), fWIDTH(2), fFILL('0'), fU8(p[i]), " ");
+      while (++i<=16)
+        STDOUT("   ");
+      STDOUT(" ! ");
+      for (i=0; i<16 && i<len; i++)
+        if (p[i]>=32 && p[i]!=128)
+          STDOUT(fCHAR(p[i]));
+        else
+          STDOUT(" ");
+      STDOUT("\n");
+      len	-= i;
+      p		+= i;
+    }
+}
+
+#ifndef ntohll
+/* stolen at https://github.com/NetworkBlockDevice/nbd/blob/29f1c78da941179aba783ea29316d52c6fa712f5/cliserv.c#L89-L103 */
+#ifdef WORDS_BIGENDEAN
+static uint64t ntohll(uint64_t x) { return x; }
+#else
+static uint64_t
+ntohll(uint64_t a)
+{
+  uint32_t lo = a & 0xffffffff;
+  uint32_t hi = a >> 32U;
+  lo = ntohl(lo);
+  hi = ntohl(hi);
+  return ((uint64_t) lo) << 32U | hi;
+}
+#endif
+#endif
 
 void
 loop(N)
 {
-  000;
-  STDOUTf(".");
+  uint32_t	magic	= ntohl(NBD_REQUEST_MAGIC);
+  uint32_t	type, len;
+  uint64_t	from;
+
+/*
+        __be32 magic;
+        __be32 type;    == READ || == WRITE
+        char handle[8];
+        __be64 from;
+        __be32 len;
+
+        case NBD_CMD_READ:
+        case NBD_CMD_WRITE:
+        case NBD_CMD_DISC:
+        case NBD_CMD_FLUSH:
+        case NBD_CMD_TRIM:
+        case NBD_CMD_WRITE_ZEROES:
+*/
+
+  struct nbd_request	r;
+
+  nbd_read(n, &r, sizeof r);
+  dump("got", &r, sizeof r);
+  if (r.magic != magic)
+    OOPS("protocol error: wrong magic");
+
+  from	= ntohll(r.from);
+  type	= ntohl(r.type);
+  len	= ntohl(r.len);
+  LOG("cmd=", fU32(type), " from=", fU64(from), " len=", fU32(len));
+
   sleep(1);
 }
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-int
-main(int argc, char **argv)
+static int
+run(N, int dev)
 {
-  static struct nasty_conf _N;
-  N = &_N;
-
-  nasty_init(n);
-
   /* get the device paramters	*/
 
   n->devsize	= 1024llu * 1024llu * 1024llu;		/* 1 GB fits into memory	*/
 
-#if 0
-  struct sockaddr_in	sa;
-
-  n->kernel_fd	= socket(AF_INET, SOCK_STREAM, 0);
-  sa.sin_family		= AF_INET;
-  sa.sin_port		= htons(9999);
-  if (inet_pton(sa.sin_family, "127.0.0.1", &sa.sin_addr)<=0)
-    OOPS("inet_pton(127.0.0.1)");
-  if (connect(n->kernel_fd, (struct sockaddr *)&sa, sizeof sa))
-    OOPS("connect failed");
-#endif
-
   /* now open /dev/nbdX	*/
-  nasty_nl_start(&n->nl, NASTY_NL_NBD_ANY, n->devsize, 1, &n->kernel_fd);
+  nasty_nl_start(&n->nl, dev, n->devsize, 1, &n->kernel_fd);
   LOG("got /dev/nbd", fINT(n->nl.nbd));
 
   /* close the unused server socket at our side	*/
@@ -86,5 +159,61 @@ main(int argc, char **argv)
   /* now run the device	.. forever? */
   for (;;)
     loop(n);
+
+  return 0;
+}
+
+static int
+attach(N, char **args)
+{
+  while (*args)
+    {
+      int	nr;
+
+      if (sscanf(*args, "/dev/nbd%d", &nr) != 1 || nr<0)
+        OOPS("not /dev/nbdX");
+      LOG("attach /dev/nbd", fINT(nr));
+      run(n, nr);
+    }
+  nasty_nl_close(&n->nl);
+  return 0;
+}
+
+static int
+detach(N, char **args)
+{
+  while (*args)
+    {
+      int	nr;
+
+      if (sscanf(*args, "/dev/nbd%d", &nr) != 1 || nr<0)
+        OOPS("not /dev/nbdX");
+      LOG("detach /dev/nbd", fINT(nr));
+      nasty_nl_stop(&n->nl, nr);
+    }
+  nasty_nl_close(&n->nl);
+  return 0;
+}
+
+static int
+cmd(N, char **args)
+{
+  if (!strcmp(args[0], "detach"))	return detach(n, args+1);
+  if (!strcmp(args[0], "attach"))	return attach(n, args+1);
+  OOPS("unknown command");
+}
+
+int
+main(int argc, char **argv)
+{
+  static struct nasty_conf _N;
+  N = &_N;
+
+  nasty_init(n);
+
+  if (argc>1)
+     return cmd(n, argv+1);
+
+  return run(n, NASTY_NL_NBD_ANY);
 }
 
