@@ -23,6 +23,62 @@ Future:
 - Encryption: Data is encrypted before it leaves the local system
 
 
+## Notes
+
+This is **not stable** yet.  `/dev/nbd` also is a very deep part of the kernel.
+Hence, even that this is userland, you can make your machine unusable.
+
+> **YOU HAVE BEEN WARNED!**
+
+Note that the kernel does not crash immediately, but slowly degrades usabilty.
+
+But you can expect more and more things to fail, which even makes the OS no more
+shutdown.  For example unkillable processes, permanently locked in memory,
+waiting for IO of a `/dev/nbdX` which can no more happen.  This is especially
+true for some most basic commands like `/bin/sync`.  They then make scripts
+block and pile up until everything is too late.  And more advanced commands
+like `lvm` become immediately unusable, as they try to access `/dev/nbdX`
+and become blocked, too.
+
+`echo b >/proc/sysrq-trigger` is your friend then.
+
+The only lucky part is that those locked processes do not eat CPU.
+However they eat more and more memory and process IDs until everything
+is eaten up by chance.  Then your machine stops responding.
+
+> **YOU HAVE BEEN WARNED!**
+
+Note that `nbd-client -d` does not help either at my side.  A there are
+`nbd` devices hung in the kernel, the `nbd` kernel module becomes unremovable, too.
+
+Effectively the only thing you can do then, is to hard-reset your machine
+to revive it.
+
+YMMV, I am experimenting with Ubuntu 18.04 and Kernel `4.15.0-58-lowlatency`.
+
+> Recommendation:  Do experiments in a scratch VM.  And be very careful when
+> using `nbd` in production.
+>
+> This does not render production instable or unusable per-se.  But it will
+> create a lot of headache until you can reboot the machine.
+
+Note that this probably is not the entire fault of this userland here.
+The kernel should make sure that things cannot go sideways this way.  Ever.
+
+However I am working on this, because I do not think things are production
+ready if they can make your machine fail without no chance to repair,
+besides a hard reboot.
+
+Perhaps this is just a lack of documentation an tooling.  So I did not
+find a tool or way yet, to "power detach" a stuck `/dev/nbd`.
+
+> There is a trick.  Use a timeout.  If there is a timeout, `/dev/nbd` will
+> timeout stuck calls, making them fail, such that you, slowly, can
+> disconnect a stuck /dev/nbd.
+>
+> Without I want to run it without any timeout, so things become very ugly.
+
+
 ## Rationale
 
 Things are failing.  Things are failing a lot.  Things are failing constantly.
